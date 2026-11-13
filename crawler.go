@@ -92,7 +92,11 @@ func (c *Crawler) Crawl(ctx context.Context) {
 
     crawled := 0
 
+
+
     for len(queue) > 0 && crawled < c.maxPages {
+        if ctx.Err() != nil { fmt.Println("crawl canceled"); break }
+
         url := queue[0]
         queue = queue[1:]
         if c.visited[url] {
