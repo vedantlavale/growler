@@ -74,27 +74,57 @@ func extractLinks(baseURL, html string)([]string, error){
 
 func (c *Crawler) Crawl(ctx context.Context) {
 
-	body, err := fetch(ctx, c.seedURL)
-	if err != nil {
-		fmt.Println("fetch error:", err)
-		return
-	}
-	fmt.Println("body bytes:", len(body))
+	//body, err := fetch(ctx, c.seedURL)
+	//if err != nil {
+	//	fmt.Println("fetch error:", err)
+	//	return
+	//}
+	//fmt.Println("body bytes:", len(body))
 
-	links, err := extractLinks(c.seedURL, body)
-	if err != nil {
-		fmt.Println("extractLinks error:", err)
-		return
-	}
+	//links, err := extractLinks(c.seedURL, body)
+	//if err != nil {
+	//	fmt.Println("extractLinks error:", err)
+	//	return
+	//}
 
 
     queue := []string{c.seedURL}
 
-    fmt.Println("extractedLinks:", len(links))
+    crawled := 0
+
+    for len(queue) > 0 && crawled < c.maxPages {
+        url := queue[0]
+        queue = queue[1:]
+        if c.visited[url] {
+            continue
+        }
+        c.visited[url] = true
+        crawled++
+
+        fmt.Println("crawling URL: ",url)
+
+        body, err := fetch(ctx, url)
+        if err != nil {
+            fmt.Println("fetch error:", err)
+            continue
+        }
+        links, err := extractLinks(url, body)
+        if err != nil {
+            fmt.Println("extractLinks error:", err)
+            continue
+        }
+        for _, link := range links {
+        	if c.visited[link] {
+        		continue
+        	}
+            queue = append(queue, link)
+        }
+    }
 
     // we are using context here because we want to be able to cancel the crawl, suppopse user hits the ctrl c then it should cancel all the process. context is used to stop the crawl gracefully.
     // ... implement the sequential BFS logic here ...
 
-    fmt.Println("queue:", queue)
+    //fmt.Println("queue:", queue)
+    fmt.Println("crawled:", crawled)
     fmt.Println("Sequential crawl finished.")
 }
