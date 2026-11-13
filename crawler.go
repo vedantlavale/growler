@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 )
 
@@ -40,6 +41,37 @@ func fetch(ctx context.Context, url string) (string, error) {
 	return string(body), nil
 }
 
+func extractLinks(baseURL, html string)([]string, error){
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	matches := linkRegex.FindAllStringSubmatch(html, -1)
+	var links []string
+
+	for _, match := range matches {
+		href := match[1]
+
+			ref, err := url.Parse(href)
+			if err != nil {
+				continue
+			}
+
+			abs := base.ResolveReference(ref)
+
+			if abs.Scheme != "http" && abs.Scheme != "https" {
+				continue
+			}
+			if abs.Host == "" {
+				continue
+			}
+
+			links = append(links, abs.String())
+	}
+	return links, nil
+}
+
 func (c *Crawler) Crawl(ctx context.Context) {
 
 	body, err := fetch(ctx, c.seedURL)
@@ -49,10 +81,17 @@ func (c *Crawler) Crawl(ctx context.Context) {
 	}
 	fmt.Println("body bytes:", len(body))
 
-	//fmt.Println(body)
+	links, err := extractLinks(c.seedURL, body)
+	if err != nil {
+		fmt.Println("extractLinks error:", err)
+		return
+	}
 
 
     queue := []string{c.seedURL}
+
+    fmt.Println("extractedLinks:", len(links))
+
     // we are using context here because we want to be able to cancel the crawl, suppopse user hits the ctrl c then it should cancel all the process. context is used to stop the crawl gracefully.
     // ... implement the sequential BFS logic here ...
 
