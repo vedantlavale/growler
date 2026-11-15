@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 )
 
 var linkRegex = regexp.MustCompile(`href="([^"]+)"`)
@@ -39,6 +40,23 @@ func fetch(ctx context.Context, url string) (string, error) {
         return "", err
 	}
 	return string(body), nil
+}
+
+func normalizeURL(raw string) (string, error){
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+
+	parsed.Host = strings.ToLower(parsed.Host)
+
+	parsed.Fragment = ""
+	if parsed.Path == ""{
+		parsed.Path = "/"
+	}
+
+	return parsed.String(), nil
 }
 
 func extractLinks(baseURL, html string)([]string, error){
@@ -87,8 +105,12 @@ func (c *Crawler) Crawl(ctx context.Context) {
 	//	return
 	//}
 
-
-    queue := []string{c.seedURL}
+	seed, err := normalizeURL(c.seedURL)
+	if err != nil {
+		fmt.Println("normalizeURL error:", err)
+		return
+	}
+    queue := []string{seed}
 
     crawled := 0
 
@@ -99,6 +121,13 @@ func (c *Crawler) Crawl(ctx context.Context) {
 
         url := queue[0]
         queue = queue[1:]
+
+        url, err := normalizeURL(url)
+        if err != nil {
+            fmt.Println("normalizeURL error:", err)
+            return
+        }
+
         if c.visited[url] {
             continue
         }
