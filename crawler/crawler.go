@@ -90,6 +90,14 @@ func extractLinks(baseURL, html string)([]string, error){
 	return links, nil
 }
 
+func (c *Crawler) markVisited(u string) bool{
+    if c.visited[u] {
+        return false
+    }
+    c.visited[u] = true
+    return true
+}
+
 func (c *Crawler) Crawl(ctx context.Context) {
 
 	//body, err := fetch(ctx, c.seedURL)
@@ -110,6 +118,7 @@ func (c *Crawler) Crawl(ctx context.Context) {
 		fmt.Println("normalizeURL error:", err)
 		return
 	}
+	c.markVisited(seed)
     queue := []string{seed}
 
     crawled := 0
@@ -128,10 +137,7 @@ func (c *Crawler) Crawl(ctx context.Context) {
             return
         }
 
-        if c.visited[url] {
-            continue
-        }
-        c.visited[url] = true
+        //c.markVisited(url)
         crawled++
 
         fmt.Println("crawling URL: ",url)
@@ -147,12 +153,18 @@ func (c *Crawler) Crawl(ctx context.Context) {
             continue
         }
         for _, link := range links {
-        	if c.visited[link] {
+        //normalize the link before claiming it as visited
+        	link, err := normalizeURL(link)
+        	if err != nil {
+        		continue
+        	}
+        	if !c.markVisited(link) {
         		continue
         	}
             queue = append(queue, link)
         }
     }
+
 
     // we are using context here because we want to be able to cancel the crawl, suppopse user hits the ctrl c then it should cancel all the process. context is used to stop the crawl gracefully.
     // ... implement the sequential BFS logic here ...
