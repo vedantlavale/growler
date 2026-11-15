@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+
+	"github.com/vedantlavale/growler/crawler"
 )
 
 
@@ -20,9 +22,9 @@ func main() {
 
 	fmt.Println(*seed, *maxPages)
 
-	c := NewCrawler(*seed, *maxPages)
+	c := crawler.NewCrawler(*seed, *maxPages)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	// now it gives you a ctx that becomes canceled when SIGINT (Ctrl+C, os.Interrupt) happens. You defer stop() to clean up the signal handler, and you pass that same ctx into c.Crawl(ctx). The call looks the same, but the context you handed over can now carry a “stop” signal.
+	// now it gives you a ctx that becomes canceled when SIGINT (Ctrl+C, os.Interrupt) happens. You defer stop() to clean up the signal handler, and you pass that same ctx into c.Crawl(ctx). The call looks the same, but the context you handed over can now carry a "stop" signal.
 
 
 
