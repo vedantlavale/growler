@@ -2,26 +2,29 @@
 
 A small web crawler written in Go. Give it a starting URL and it walks the links it finds, page by page, until it hits the limit you set or you hit Ctrl+C.
 
-It is also my learning project: a first Go program built to understand `net/http`, HTML parsing, goroutines, channels and context cancellation. The code is deliberately small and heavily commented so it can be read top to bottom.
+This is a side project, and it is a work in progress. It started as an experiment with Go's `net/http`, goroutines, channels and context cancellation, and it's growing from there. The code is deliberately small and commented so it can be read top to bottom.
+
+Expect the feature set to change as the crawler gets smarter. Pull requests and ideas are welcome.
 
 ## What it does right now
 
 - Fetches a seed URL over HTTP and pulls every `href` out of the HTML.
 - Resolves relative links (`/about`, `../docs`) into absolute URLs.
 - Ignores anything that isn't `http` or `https`, so `mailto:` and `javascript:` links are skipped.
-- Normalizes URLs before crawling (lowercases the scheme and host, drops the `#fragment`, defaults an empty path to `/`) so the same page isn't fetched twice under different spellings.
+- Normalizes URLs before crawling (lowercases the scheme and host, drops the `#fragment`, defaults an empty path to `/`).
 - Keeps a `visited` set and claims a URL the moment it's queued, so the same page is never fetched twice under different spellings.
 - Runs the crawl through a `jobs` channel that a worker goroutine drains — the channel-based setup that a pool of workers will plug into next.
 - Stops gracefully on Ctrl+C: the context is cancelled, in-flight requests are aborted, and the program exits cleanly.
 
 ## What it doesn't do yet
 
-Being honest about the current state:
+This is a work in progress, so here's what's still missing:
 
 - **Link discovery is not wired up to the queue.** The workers fetch pages and count the links they find, but discovered links aren't enqueued yet, so in practice only the seed page gets fetched. This is the next milestone (see [Roadmap](#roadmap)).
 - **No politeness controls.** There's no robots.txt handling, no per-host delay and no user-agent header, so please don't point it at a large site.
 - **No persistent output.** Results are printed to stdout; nothing is written to disk and there's no way to resume a crawl later.
 - **Only `href` attributes are parsed**, via a regular expression. Links inside `<script>`, inline styles or JSON blobs are ignored.
+- **The `-max` limit isn't enforced yet.** The value is plumbed through the crawler, but the page budget is applied once the queue starts feeding itself (see [Roadmap](#roadmap)).
 
 ## Requirements
 
@@ -54,7 +57,7 @@ go run . -seed https://example.com -max 10
 | Flag | Default | What it does |
 | --- | --- | --- |
 | `-seed` | `https://vedantworks.com` | The URL the crawl starts from. |
-| `-max` | `10` | The maximum number of pages to crawl. |
+| `-max` | `10` | The maximum number of pages to crawl. Not enforced yet — see [What it doesn't do yet](#what-it-doesnt-do-yet). |
 
 ## Example run
 
@@ -106,15 +109,14 @@ Today a single worker goroutine drains the channel. The next milestone is to sta
 ├── main.go            # Flags, signal handling, wiring
 ├── crawler/
 │   └── crawler.go     # The crawler: fetch, parse, normalize, workers
-├── go.mod
-└── .walkthrough/      # Personal learning notes and the build roadmap
+└── go.mod
 ```
 
-The `.walkthrough` directory is where the project keeps its plan: `roadmap.md` lists the milestones and what's done, `notes.md` records the technical decisions and the reasons behind them, and `gaps.md` lists the things that needed fixing along the way. It's the history of how the crawler got here, and it's the first place to look if you want to follow the project from the beginning.
+The crawler is intentionally two files. `main.go` deals with the outside world — flags, signals, wiring — and `crawler/` holds the logic that can be tested on its own.
 
 ## Roadmap
 
-The plan is broken into milestones, tracked in `.walkthrough/roadmap.md`:
+The project is built in milestones, and this is roughly where it stands:
 
 - **M1 — Skeleton and cancellation** — done
 - **M2 — Fetch and parse** — done
@@ -123,13 +125,13 @@ The plan is broken into milestones, tracked in `.walkthrough/roadmap.md`:
 - **M5 — Completion tracking** — not started
 - **M6 — End-to-end run** — not started
 
-The immediate next step is finishing M4: running several workers against the shared channel and having the producer enqueue the seed plus every link the workers discover.
+The immediate next step is finishing M4: running several workers against the shared channel and having the producer enqueue the seed plus every link the workers discover. After that comes completion tracking (knowing when there is genuinely nothing left to crawl) and a full end-to-end run.
 
 ## Contributing
 
-This is a personal learning project, but issues and pull requests are welcome — especially if you can help squash a bug or explain a Go concept more clearly than the comments do.
+This is a side project and it's still moving, so issues and pull requests are welcome — bug reports, ideas for features, or a better way to do something that already exists.
 
-If you'd like to pick something up, look at `.walkthrough/roadmap.md` for the open milestones, then open an issue describing what you want to work on before you start.
+If you'd like to pick something up, open an issue describing what you want to work on before you start, so we don't both build the same thing.
 
 Before opening a pull request:
 
