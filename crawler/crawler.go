@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 var linkRegex = regexp.MustCompile(`href="([^"]+)"`)
@@ -16,10 +17,16 @@ type Crawler struct {
     seedURL  string
     visited  map[string]bool
     maxPages int
+    jobs chan string
 }
 
 func NewCrawler(seed string, max int) *Crawler {
-    return &Crawler{seedURL: seed, visited: make(map[string]bool), maxPages: max}
+    return &Crawler{
+        seedURL:  seed,
+        visited:  make(map[string]bool),
+        maxPages: max,
+        jobs:     make(chan string),
+    }
 }
 
 func fetch(ctx context.Context, url string) (string, error) {
@@ -98,6 +105,31 @@ func (c *Crawler) markVisited(u string) bool{
     return true
 }
 
+func (c *Crawler) worker(ctx context.Context) {
+    for {
+        url, ok := <- c.jobs
+        if !ok {
+            return
+        }
+        if ctx.Err() != nil {
+            return
+        }
+        fmt.Println("crawling URL: ", url)
+
+        body, err := fetch(ctx, url)
+        if err != nil {
+            fmt.Println("fetch error:", err)
+            continue
+        }
+        links, err := extractLinks(url, body)
+        if err != nil {
+            fmt.Println("extractLinks error:", err)
+            continue
+        }
+        fmt.Println("links found: ",len(links))
+    }
+}
+
 func (c *Crawler) Crawl(ctx context.Context) {
 
 	//body, err := fetch(ctx, c.seedURL)
@@ -119,57 +151,19 @@ func (c *Crawler) Crawl(ctx context.Context) {
 		return
 	}
 	c.markVisited(seed)
-    queue := []string{seed}
 
-    crawled := 0
+    var wg sync.WaitGroup
 
-
-
-    for len(queue) > 0 && crawled < c.maxPages {
-        if ctx.Err() != nil { fmt.Println("crawl canceled"); break }
-
-        url := queue[0]
-        queue = queue[1:]
-
-        url, err := normalizeURL(url)
-        if err != nil {
-            fmt.Println("normalizeURL error:", err)
-            return
-        }
-
-        //c.markVisited(url)
-        crawled++
-
-        fmt.Println("crawling URL: ",url)
-
-        body, err := fetch(ctx, url)
-        if err != nil {
-            fmt.Println("fetch error:", err)
-            continue
-        }
-        links, err := extractLinks(url, body)
-        if err != nil {
-            fmt.Println("extractLinks error:", err)
-            continue
-        }
-        for _, link := range links {
-        //normalize the link before claiming it as visited
-        	link, err := normalizeURL(link)
-        	if err != nil {
-        		continue
-        	}
-        	if !c.markVisited(link) {
-        		continue
-        	}
-            queue = append(queue, link)
-        }
-    }
-
+    wg.Go(func(){
+        c.worker(ctx)
+    })
+    c.jobs <- seed
+    close(c.jobs)
+    wg.Wait()
 
     // we are using context here because we want to be able to cancel the crawl, suppopse user hits the ctrl c then it should cancel all the process. context is used to stop the crawl gracefully.
     // ... implement the sequential BFS logic here ...
 
     //fmt.Println("queue:", queue)
-    fmt.Println("crawled:", crawled)
     fmt.Println("Sequential crawl finished.")
 }
